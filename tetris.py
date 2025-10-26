@@ -167,6 +167,12 @@ class Game:
         self.ARE_DELAY = 100; self.ARE_DELAY_LINE_CLEAR = 400
         self.NOTIFICATION_DURATION = 700
         self.screen = screen
+        # [新規] Tetr.io準拠 (LEGACYモード用) パラメータ
+        self.DAS_DELAY_LEGACY = 133
+        self.ARR_SPEED_LEGACY = 0
+        self.ARE_DELAY_LEGACY = 0
+        self.ARE_DELAY_LINE_CLEAR_LEGACY = 0
+        self.LOCK_DELAY_DURATION_LEGACY = 500 # (参考値: Tetr.ioデフォルトと同じ)
         self.state = 'MENU'
         # [改修] メニューオプションと状態
         self.game_mode = None
@@ -183,8 +189,11 @@ class Game:
         self.selected_difficulty = 0; self.garbage_stock = 0; self.attack_timer = 0
         self.current_attack_interval = 0; self.current_attack_amount = 0
         self.progress_counter = 0; self.gauntlet_level = 1; self.gauntlet_max_level = 0
-        self.gauntlet_attack_tables = {
-            'EASY': {1: (1, 12000), 2: (1, 10000), 3: (1, 9000), 4: (2, 15000), 5: (2, 13000), 6: (2, 11000), 7: (2, 9500), 8: (2, 8000), 9: (2, 7000), 10: (3, 9000)},
+        self.gauntlet_legacy_mode = False # [新規] 裏モードフラグ
+        # [改修] 既存のテーブルを legacy (裏モード用) にリネーム
+        # [改修] EASYのテーブルを調整
+        self.gauntlet_attack_tables_legacy = {
+            'EASY': {1: (2, 24000), 2: (2, 21000), 3: (2, 18000), 4: (2, 15000), 5: (2, 13000), 6: (3, 17000), 7: (3, 14000), 8: (3, 12000), 9: (3, 10500), 10: (3, 9000)},
             'NORMAL': {1: (3, 12000), 2: (3, 11000), 3: (3, 10500), 4: (3, 9700), 5: (3, 9000), 6: (3, 8500), 7: (3, 8000), 8: (3, 7500), 9: (3, 7000), 10: (4, 8500),
                        11: (4, 8000), 12: (4, 7500), 13: (4, 7000), 14: (4, 6500), 15: (4, 6000)},
             'HARD': {1: (4, 6800), 2: (4, 6600), 3: (4, 6200), 4: (4, 6000), 5: (4, 5700), 6: (4, 5500), 7: (4, 5300), 8: (4, 5000), 9: (4, 4800), 10: (4, 4600), 
@@ -195,6 +204,21 @@ class Game:
                         11: (5, 3400), 12: (5, 3350), 13: (5, 3290), 14: (5, 3240), 15: (5, 3190), 16: (5, 3140), 17: (5, 3090), 18: (5, 3040), 19: (5, 3000), 20: (5, 2940),
                         21: (5, 2890), 22: (5, 2850), 23: (5, 2800), 24: (5, 2760), 25: (5, 2710), 26: (5, 2670), 27: (5, 2620), 28: (5, 2580), 29: (5, 2540), 30: (5, 2500)}
         }
+        
+        # [新規] 新しいテーブル
+        self.gauntlet_attack_tables = {
+            'EASY': {1: (2, 24000), 2: (2, 21000), 3: (2, 18000), 4: (2, 15000), 5: (2, 13000), 6: (3, 17000), 7: (3, 14000), 8: (3, 12000), 9: (3, 10500), 10: (3, 9000)},
+            'NORMAL': {1: (3, 12000), 2: (3, 11000), 3: (3, 10500), 4: (3, 10000), 5: (3, 9500), 6: (3, 9000), 7: (3, 8500), 8: (3, 8000), 9: (3, 7500), 10: (3, 7000), 
+                       11: (4, 9000), 12: (4, 8500), 13: (4, 8000), 14: (4, 7500), 15: (4, 7000)},
+            'HARD': {1: (4, 8000), 2: (4, 7700), 3: (4, 7500), 4: (4, 7200), 5: (4, 7000), 6: (4, 6700), 7: (4, 6500), 8: (4, 6200), 9: (4, 6000), 10: (4, 5800), 
+                     11: (5, 7000), 12: (5, 6700), 13: (5, 6500), 14: (5, 6200), 15: (5, 6000)},
+            'EXTREME': {1: (4, 6000), 2: (4, 5850), 3: (4, 5700), 4: (4, 5500), 5: (4, 5400), 6: (4, 5300), 7: (4, 5150), 8: (4, 5000), 9: (4, 4900), 10: (4, 4750), 
+                        11: (5, 5800), 12: (5, 5650), 13: (5, 5500), 14: (5, 5400), 15: (5, 5250), 16: (5, 5100), 17: (5, 5000), 18: (5, 4850), 19: (5, 4700), 20: (5, 4600)},
+            'THE SUN': {1: (5, 5500), 2: (5, 5400), 3: (5, 5300), 4: (5, 5250), 5: (5, 5200), 6: (5, 5100), 7: (5, 5050), 8: (5, 4980), 9: (5, 4920), 10: (5, 4850), 
+                        11: (5, 4800), 12: (5, 4750), 13: (5, 4650), 14: (5, 4600), 15: (5, 4550), 16: (5, 4500), 17: (5, 4440), 18: (5, 4380), 19: (5, 4320), 20: (5, 4260),
+                        21: (5, 4210), 22: (5, 4160), 23: (5, 4100), 24: (5, 4050), 25: (5, 4000), 26: (5, 3950), 27: (5, 3900), 28: (5, 3850), 29: (5, 3800), 30: (5, 3750)}
+        }
+        
         self.garbage_gauge_height = FIELD_HEIGHT * GRID_SIZE
 
         self.board = Board(); self.current_tetromino = None
@@ -218,6 +242,7 @@ class Game:
         self.notifications = []; self.hold_tetromino = None; self.current_tetromino = None
         self.initial_action = None; self.master_timer = 0; self.end_roll_timer = 65000; self.roll_prep_timer = 0
         self.garbage_stock = 0; self.attack_timer = 0; self.progress_counter = 0; self.gauntlet_level = 1
+        self.gauntlet_alternate_mode = False # [新規] リスタート時にフラグをリセット
 
         self.bag = []
         first_mino = random.choice(['I', 'J', 'L', 'T']); self.bag.append(first_mino)
@@ -229,8 +254,23 @@ class Game:
         if self.game_mode == 'APEX': # [改修] MASTER -> APEX
             self.update_master_speeds()
         elif self.game_mode == 'GAUNTLET':
-            self.fall_speed = 1000; self.ARE_DELAY = 100; self.ARE_DELAY_LINE_CLEAR = 400
-            self.lock_delay_duration = 500; self.DAS_DELAY = 160; self.ARR_SPEED = 20
+            # [改修] LEGACYモードかどうかでパラメータを切り替える
+            if self.gauntlet_legacy_mode:
+                # Tetr.io準拠 (LEGACY) 設定
+                self.fall_speed = 1000
+                self.ARE_DELAY = self.ARE_DELAY_LEGACY
+                self.ARE_DELAY_LINE_CLEAR = self.ARE_DELAY_LINE_CLEAR_LEGACY
+                self.lock_delay_duration = self.LOCK_DELAY_DURATION_LEGACY
+                self.DAS_DELAY = self.DAS_DELAY_LEGACY
+                self.ARR_SPEED = self.ARR_SPEED_LEGACY
+            else:
+                # 標準 (デフォルト) 設定
+                self.fall_speed = 1000
+                self.ARE_DELAY = 100
+                self.ARE_DELAY_LINE_CLEAR = 400
+                self.lock_delay_duration = 500
+                self.DAS_DELAY = 160
+                self.ARR_SPEED = 20
             self.level = 1 
             self.set_gauntlet_attack_params()
             if self.gauntlet_difficulty == 'EASY': self.gauntlet_max_level = 10
@@ -253,7 +293,14 @@ class Game:
 
     def set_gauntlet_attack_params(self):
         if self.game_mode != 'GAUNTLET' or self.gauntlet_difficulty is None: return
-        table = self.gauntlet_attack_tables[self.gauntlet_difficulty]
+        
+        # [改修] 裏モードフラグに応じて使用するテーブルセットを決定
+        active_table_set = self.gauntlet_attack_tables
+        if self.gauntlet_legacy_mode:
+            print("Using LEGACY tables for Alternate Mode.") # デバッグ用
+            active_table_set = self.gauntlet_attack_tables_legacy
+        
+        table = active_table_set[self.gauntlet_difficulty]
         level_key = min(self.level, max(table.keys()))
         self.current_attack_amount, self.current_attack_interval = table[level_key]
         self.attack_timer = self.current_attack_interval # タイマーリセット
@@ -288,13 +335,29 @@ class Game:
             if self.key_pressed[direction]:
                 self.das_timer[direction] += delta_time
                 if self.das_timer[direction] > self.DAS_DELAY:
-                    self.arr_timer[direction] += delta_time
-                    while self.arr_timer[direction] > self.ARR_SPEED:
-                        if self.state in ("PLAYING", "END_ROLL") and self.current_tetromino and self.current_tetromino.move(-1 if direction == "left" else 1, 0, self.board):
-                            self.last_move_was_rotate = False; self.reset_lock_delay_if_grounded()
-                        self.arr_timer[direction] -= self.ARR_SPEED
+                    
+                    dx = -1 if direction == "left" else 1
+                    
+                    if self.ARR_SPEED == 0:
+                        # [新規] ARR=0 (即時移動) の処理
+                        self.arr_timer[direction] = 0 # タイマーリセット
+                        
+                        # DAS完了フレームで壁まで移動
+                        while self.state in ("PLAYING", "END_ROLL") and self.current_tetromino and self.current_tetromino.move(dx, 0, self.board):
+                            self.last_move_was_rotate = False
+                            self.reset_lock_delay_if_grounded()
+                            
+                    else:
+                        # [既存] ARR > 0 (通常リピート) の処理
+                        self.arr_timer[direction] += delta_time
+                        while self.arr_timer[direction] > self.ARR_SPEED:
+                            if self.state in ("PLAYING", "END_ROLL") and self.current_tetromino and self.current_tetromino.move(dx, 0, self.board):
+                                self.last_move_was_rotate = False
+                                self.reset_lock_delay_if_grounded()
+                            self.arr_timer[direction] -= self.ARR_SPEED
             else:
-                self.das_timer[direction] = 0; self.arr_timer[direction] = 0
+                self.das_timer[direction] = 0
+                self.arr_timer[direction] = 0
     def update_countdown(self, delta_time):
         self.countdown_timer -= delta_time
         if self.countdown_timer > 1000: self.countdown_text = "Ready?"
@@ -353,19 +416,44 @@ class Game:
         is_soft_dropping_now = keys[pygame.K_DOWN] and self.state in ("PLAYING", "END_ROLL")
         if is_soft_dropping_now and not self.was_soft_dropping: self.fall_time = 0
         self.was_soft_dropping = is_soft_dropping_now
+        
         self.fall_time += delta_time
-        current_speed = (self.fall_speed / 20) if is_soft_dropping_now else self.fall_speed
-        if current_speed <= 0: current_speed = 0.001 
-        drop_count = 0
-        while self.fall_time >= current_speed: drop_count += 1; self.fall_time -= current_speed
-        if drop_count > 0:
-            for _ in range(drop_count):
-                if not self.board.is_valid_position(self.current_tetromino, offset_y=1): break
-                self.current_tetromino.move(0, 1, self.board)
-                # [改修] SPRINTもソフトドロップスコアなし
-                if is_soft_dropping_now and self.game_mode in ['GAUNTLET', 'SPRINT']: pass 
-                elif is_soft_dropping_now and self.game_mode != 'APEX': self.score += 1
-            if self.board.is_valid_position(self.current_tetromino, offset_y=1): self.is_grounded = False; self.lock_delay_timer = 0
+        
+        # [改修] LEGACYモードのソフトドロップ分岐
+        legacy_soft_drop = self.gauntlet_legacy_mode and is_soft_dropping_now and self.game_mode == 'GAUNTLET'
+
+        if legacy_soft_drop:
+            # [新規] LEGACYモードのソフトドロップ (即接地)
+            ghost_y = self.board.get_ghost_y(self.current_tetromino)
+            if self.current_tetromino.y < ghost_y:
+                self.current_tetromino.y = ghost_y
+                self.last_move_was_rotate = False
+                # 接地したのでロックディレイタイマーを開始/リセット
+                if not self.is_grounded: 
+                    self.is_grounded = True
+                    self.lock_delay_timer = 0
+                self.reset_lock_delay_if_grounded()
+            # この場合、通常の重力落下/SD落下はスキップ
+            
+        else:
+            # [既存] 通常の落下処理 (重力または標準ソフトドロップ)
+            current_speed = (self.fall_speed / 20) if is_soft_dropping_now else self.fall_speed
+            if current_speed <= 0: current_speed = 0.001 
+            drop_count = 0
+            while self.fall_time >= current_speed: 
+                drop_count += 1
+                self.fall_time -= current_speed
+            
+            if drop_count > 0:
+                for _ in range(drop_count):
+                    if not self.board.is_valid_position(self.current_tetromino, offset_y=1): break
+                    self.current_tetromino.move(0, 1, self.board)
+                    if is_soft_dropping_now and self.game_mode in ['GAUNTLET', 'SPRINT']: pass 
+                    elif is_soft_dropping_now and self.game_mode != 'APEX': self.score += 1
+                if self.board.is_valid_position(self.current_tetromino, offset_y=1): 
+                    self.is_grounded = False
+                    self.lock_delay_timer = 0
+        
         is_currently_grounded = not self.board.is_valid_position(self.current_tetromino, offset_y=1)
         if is_currently_grounded:
             if not self.is_grounded: self.is_grounded = True; self.lock_delay_timer = 0
@@ -600,7 +688,17 @@ class Game:
                  if event.key == pygame.K_UP: self.selected_difficulty = (self.selected_difficulty - 1) % len(self.difficulty_options)
                  elif event.key == pygame.K_DOWN: self.selected_difficulty = (self.selected_difficulty + 1) % len(self.difficulty_options)
                  elif event.key == pygame.K_RETURN:
-                     self.gauntlet_difficulty = self.difficulty_options[self.selected_difficulty]
+                     # [改修] 裏モード判定 (Shift or Ctrl + Enter)
+                     selected_difficulty_name = self.difficulty_options[self.selected_difficulty]
+                     mods = pygame.key.get_mods()
+                     is_alternate = (mods & pygame.KMOD_SHIFT) or (mods & pygame.KMOD_CTRL)
+                     
+                     if is_alternate and selected_difficulty_name != 'EASY':
+                         self.gauntlet_legacy_mode = True
+                     else:
+                         self.gauntlet_legacy_mode = False
+                         
+                     self.gauntlet_difficulty = selected_difficulty_name
                      self.reset_game_variables(); self.state = 'COUNTDOWN'; self.countdown_timer = 2000
                  elif event.key == pygame.K_ESCAPE: self.state = 'MENU'
             elif self.state in ("ARE", "ARE_END_ROLL", "COUNTDOWN", "END_ROLL"):
