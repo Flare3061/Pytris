@@ -222,16 +222,16 @@ class Game:
         
         # [新規] 新しいテーブル
         self.gauntlet_attack_tables = {
-            'EASY': {1: (2, 24000), 2: (2, 21000), 3: (2, 18000), 4: (2, 15000), 5: (2, 13000), 6: (3, 17000), 7: (3, 14000), 8: (3, 12000), 9: (3, 10500), 10: (3, 9000)},
-            'NORMAL': {1: (3, 12000), 2: (3, 11000), 3: (3, 10500), 4: (3, 10000), 5: (3, 9500), 6: (3, 9000), 7: (3, 8500), 8: (3, 8000), 9: (3, 7500), 10: (3, 7000), 
-                       11: (4, 9000), 12: (4, 8500), 13: (4, 8000), 14: (4, 7500), 15: (4, 7000)},
-            'HARD': {1: (4, 8000), 2: (4, 7700), 3: (4, 7500), 4: (4, 7200), 5: (4, 7000), 6: (4, 6700), 7: (4, 6500), 8: (4, 6200), 9: (4, 6000), 10: (4, 5800), 
-                     11: (5, 7000), 12: (5, 6700), 13: (5, 6500), 14: (5, 6200), 15: (5, 6000)},
-            'EXTREME': {1: (4, 6000), 2: (4, 5850), 3: (4, 5700), 4: (4, 5500), 5: (4, 5400), 6: (4, 5300), 7: (4, 5150), 8: (4, 5000), 9: (4, 4900), 10: (4, 4750), 
-                        11: (5, 5800), 12: (5, 5650), 13: (5, 5500), 14: (5, 5400), 15: (5, 5250), 16: (5, 5100), 17: (5, 5000), 18: (5, 4850), 19: (5, 4700), 20: (5, 4600)},
-            'THE SUN': {1: (5, 5500), 2: (5, 5400), 3: (5, 5300), 4: (5, 5250), 5: (5, 5200), 6: (5, 5100), 7: (5, 5050), 8: (5, 4980), 9: (5, 4920), 10: (5, 4850), 
-                        11: (5, 4800), 12: (5, 4750), 13: (5, 4650), 14: (5, 4600), 15: (5, 4550), 16: (5, 4500), 17: (5, 4440), 18: (5, 4380), 19: (5, 4320), 20: (5, 4260),
-                        21: (5, 4210), 22: (5, 4160), 23: (5, 4100), 24: (5, 4050), 25: (5, 4000), 26: (5, 3950), 27: (5, 3900), 28: (5, 3850), 29: (5, 3800), 30: (5, 3750)}
+            'EASY': {1: (2, 24000), 2: (2, 21000), 3: (2, 19000), 4: (2, 17000), 5: (2, 15000), 6: (3, 20000), 7: (3, 17000), 8: (3, 15000), 9: (3, 13500), 10: (3, 12000)},
+            'NORMAL': {1: (3, 18000), 2: (3, 16500), 3: (3, 15000), 4: (3, 14000), 5: (3, 13000), 6: (3, 12000), 7: (3, 11000), 8: (3, 10000), 9: (3, 9500), 10: (3, 9000),
+                       11: (4, 11000), 12: (4, 10000), 13: (4, 9000), 14: (4, 8500), 15: (4, 8000)},
+            'HARD': {1: (3, 7200), 2: (3, 7000), 3: (3, 6700), 4: (3, 6500), 5: (3, 6300), 6: (4, 8000), 7: (4, 7800), 8: (4, 7600), 9: (4, 7300), 10: (4, 7100), 
+                     11: (4, 6900), 12: (5, 6600), 13: (5, 6400), 14: (5, 6200), 15: (5, 6000)},
+            'EXTREME': {1: (4, 8000), 2: (4, 7700), 3: (4, 7400), 4: (4, 7200), 5: (4, 6900), 6: (4, 6700), 7: (4, 6400), 8: (4, 6200), 9: (4, 6000), 10: (4, 5750), 
+                        11: (4, 5550), 12: (4, 5350), 13: (4, 5150), 14: (4, 5000), 15: (4, 4800), 16: (5, 5800), 17: (5, 5500), 18: (5, 5400), 19: (5, 5200), 20: (5, 5000)},
+            'THE SUN': {1: (5, 6600), 2: (5, 6500), 3: (5, 6450), 4: (5, 6350), 5: (5, 6270), 6: (5, 6180), 7: (5, 6080), 8: (5, 6000), 9: (5, 5900), 10: (5, 5810), 
+                        11: (5, 5720), 12: (5, 5640), 13: (5, 5550), 14: (5, 5470), 15: (5, 5390), 16: (5, 5300), 17: (5, 5220), 18: (5, 5150), 19: (5, 5070), 20: (5, 5000),
+                        21: (5, 4920), 22: (5, 4840), 23: (5, 4770), 24: (5, 4700), 25: (5, 4620), 26: (5, 4560), 27: (5, 4500), 28: (5, 4420), 29: (5, 4350), 30: (5, 4300)}
         }
         
         self.garbage_gauge_height = FIELD_HEIGHT * GRID_SIZE
@@ -670,7 +670,7 @@ class Game:
             self.state = "ARE"
         
         self.are_timer = self.ARE_DELAY_LINE_CLEAR if lines > 0 else self.ARE_DELAY
-        self.current_tetromino = None; self.initial_action = None
+        self.current_tetromino = None; self.initial_action = None; self.last_move_was_rotate = False
 
     def update_standard_level_and_speed(self):
         # [改修] MARATHONのタイプ別に勝利判定
@@ -859,22 +859,22 @@ class Game:
                      self.state = 'MENU'
 
             elif self.state == 'DIFFICULTY_SELECT':
-                 if event.key == pygame.K_UP: self.selected_difficulty = (self.selected_difficulty - 1) % len(self.difficulty_options)
-                 elif event.key == pygame.K_DOWN: self.selected_difficulty = (self.selected_difficulty + 1) % len(self.difficulty_options)
-                 elif event.key == pygame.K_RETURN:
-                     # [改修] 裏モード判定 (Shift or Ctrl + Enter)
-                     selected_difficulty_name = self.difficulty_options[self.selected_difficulty]
-                     mods = pygame.key.get_mods()
-                     is_alternate = (mods & pygame.KMOD_SHIFT) or (mods & pygame.KMOD_CTRL)
-                     
-                     if is_alternate and selected_difficulty_name != 'EASY':
-                         self.gauntlet_legacy_mode = True
-                     else:
-                         self.gauntlet_legacy_mode = False
-                         
-                     self.gauntlet_difficulty = selected_difficulty_name
-                     self.reset_game_variables(); self.state = 'COUNTDOWN'; self.countdown_timer = 2000
-                 elif event.key == pygame.K_ESCAPE: self.state = 'MENU'
+                if event.key == pygame.K_UP: self.selected_difficulty = (self.selected_difficulty - 1) % len(self.difficulty_options)
+                elif event.key == pygame.K_DOWN: self.selected_difficulty = (self.selected_difficulty + 1) % len(self.difficulty_options)
+                elif event.key == pygame.K_RETURN:
+                    # [改修] 裏モード判定 (Shift or Ctrl + Enter)
+                    selected_difficulty_name = self.difficulty_options[self.selected_difficulty]
+                    mods = pygame.key.get_mods()
+                    is_alternate = (mods & pygame.KMOD_SHIFT) or (mods & pygame.KMOD_CTRL)
+                    
+                    if is_alternate:
+                        self.gauntlet_legacy_mode = True
+                    else:
+                        self.gauntlet_legacy_mode = False
+                        
+                    self.gauntlet_difficulty = selected_difficulty_name
+                    self.reset_game_variables(); self.state = 'COUNTDOWN'; self.countdown_timer = 2000
+                elif event.key == pygame.K_ESCAPE: self.state = 'MENU'
             elif self.state in ("ARE", "ARE_END_ROLL", "COUNTDOWN", "END_ROLL"):
                 if event.key in (pygame.K_UP, pygame.K_x):
                     if self.initial_action == "ROTATE_CW": self.initial_action = "ROTATE_180"
