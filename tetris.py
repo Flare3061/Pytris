@@ -173,6 +173,10 @@ class Game:
         self.ARE_DELAY_LEGACY = 0
         self.ARE_DELAY_LINE_CLEAR_LEGACY = 0
         self.LOCK_DELAY_DURATION_LEGACY = 500 # (参考値: Tetr.ioデフォルトと同じ)
+        
+        # [新規] Tetr.io準拠 B2B (Surge) ボーナステーブル
+        self.b2b_surge_bonuses = {0: 0, 2: 1, 4: 2, 9: 3, 25: 4, 68: 5, 186: 6, 505: 7, 1371: 8}
+
         self.state = 'MENU'
         # [改修] メニューオプションと状態
         self.game_mode = None
@@ -250,6 +254,7 @@ class Game:
         self.score = 0; self.level = 0 if self.game_mode == 'APEX' else 1
         self.lines_cleared_total = 0; self.fall_speed = 1000; self.fall_time = 0
         self.b2b_active = False; self.ren_counter = -1
+        self.b2b_streak = 0 # [新規] Legacyモード (Tetr.io) のB2Bカウント
         self.notifications = []; self.hold_tetromino = None; self.current_tetromino = None
         self.initial_action = None; self.master_timer = 0; self.end_roll_timer = 65000; self.roll_prep_timer = 0
         self.garbage_stock = 0; self.attack_timer = 0; self.progress_counter = 0; self.gauntlet_level = 1
@@ -515,9 +520,9 @@ class Game:
         if self.is_grounded and self.lock_delay_resets < self.lock_delay_reset_limit:
             self.lock_delay_timer = 0; self.lock_delay_resets += 1
     
-    def calculate_attack_power(self, lines, t_spin_type, is_b2b, ren_counter, is_pc):
-        """ [新規] ガイドライン準拠の攻撃力計算 """
-        if is_pc: return 10
+    def calculate_guideline_attack_power(self, lines, t_spin_type, is_b2b, ren_counter, is_pc):
+        """ [改修] ガイドライン準拠の攻撃力計算 (is_difficultを返す) """
+        if is_pc: return 10, True
 
         base_attack = 0
         is_difficult = False
@@ -526,24 +531,74 @@ class Game:
             if lines == 1: base_attack = 2; is_difficult = True
             elif lines == 2: base_attack = 4; is_difficult = True
             elif lines == 3: base_attack = 6; is_difficult = True
-            # T-Spin 0 lines は攻撃力0 (B2B維持のみ)
         elif t_spin_type == "MINI":
-             if lines == 1: base_attack = 1 # Mini Single は 1
-             # Mini Double は 0
+             if lines == 1: base_attack = 1; is_difficult = True
+        elif lines == 1: base_attack = 0
+        elif lines == 2: base_attack = 1
+        elif lines == 3: base_attack = 2
+        elif lines == 4: base_attack = 4; is_difficult = True
+        
+        b2b_bonus = 1 if (is_difficult and is_b2b) else 0
+
+        ren_bonuses = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]
+        ren_bonus = ren_bonuses[min(ren_counter, len(ren_bonuses)-1)] if ren_counter >= 0 else 0
+        
+        total_attack = base_attack + b2b_bonus + ren_bonus
+        
+        return total_attack, is_difficult
+    
+    def calculate_tetrio_attack_power(self, lines, t_spin_type, b2b_streak, ren_counter, is_pc):
+        """ [新規] Tetr.io準拠の攻撃力計算 (Multiplier, Surge) """
+        if is_pc: return 10, True # PCは 10固定, B2Bカウント対象
+
+        base_attack = 0
+        is_difficult = False
+
+        if t_spin_type == "FULL":
+            if lines == 1: base_attack = 2
+            elif lines == 2: base_attack = 4
+            elif lines == 3: base_attack = 6
+            is_difficult = True # T-SpinはB2B対象
+        elif t_spin_type == "MINI":
+            if lines == 1: base_attack = 1 # Mini Single は 1 (Tetr.io)
+            is_difficult = True
+            # Mini Double は 0
         elif lines == 1: base_attack = 0 # Single
         elif lines == 2: base_attack = 1 # Double
         elif lines == 3: base_attack = 2 # Triple
         elif lines == 4: base_attack = 4; is_difficult = True # Tetris
         
-        b2b_bonus = 1 if (is_difficult and is_b2b) else 0
+        # B2B (Surge) ボーナス
+        b2b_bonus = 0
+        if is_difficult and b2b_streak > 0:
+            b2b_bonus = self.calculate_b2b_surge_bonus(b2b_streak)
+            # print(f"Surge active: Streak {b2b_streak}, Bonus {b2b_bonus}")
 
-        ren_bonuses = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5] # 0-11 REN
-        ren_bonus = ren_bonuses[min(ren_counter, len(ren_bonuses)-1)] if ren_counter >= 0 else 0
+        total_base_attack = base_attack + b2b_bonus
+
+        total_attack = 0
         
-        total_attack = base_attack + b2b_bonus + ren_bonus
+        # コンボ計算 (Multiplier)
+        if total_base_attack > 0:
+            # Base > 0 の場合: Base * (1 + 0.25 * REN)
+            multiplier = 1.0 + (0.25 * ren_counter) if ren_counter >= 0 else 1.0
+            total_attack = total_base_attack * multiplier
+        elif ren_counter >= 1:
+            # Base = 0 (Singleなど) かつ 2-REN (ren_counter=1) 以上の場合: ln(1 + 1.25 * REN)
+            total_attack = math.log(1.0 + 1.25 * ren_counter)
         
-        # print(f"Attack Calc: lines={lines}, spin={t_spin_type}, b2b={is_b2b}, ren={ren_counter}, pc={is_pc} -> Base={base_attack}, B2B={b2b_bonus}, Ren={ren_bonus}, Total={total_attack}")
-        return total_attack
+        # Tetr.ioはデフォルトで切り捨て (Rounding Mode: DOWN)
+        return math.floor(total_attack), is_difficult
+    
+    def calculate_b2b_surge_bonus(self, b2b_streak):
+        """ [新規] Tetr.io準拠のB2Bサージボーナス計算 """
+        bonus = 0
+        for index, val in enumerate(self.b2b_surge_bonuses):
+            if b2b_streak >= index:
+                bonus = val
+            else:
+                break
+        return bonus
     
     def lock_down(self):
         if self.current_tetromino is None or not (not self.board.is_valid_position(self.current_tetromino, offset_y=1)): return
@@ -555,32 +610,41 @@ class Game:
         if lines > 0: self.ren_counter += 1
         else: self.ren_counter = -1
         
+        # [改修] 攻撃力計算の分岐
+        is_legacy = (self.gauntlet_legacy_mode and self.game_mode == 'GAUNTLET') or \
+                    (self.ultra_legacy_mode and self.game_mode == 'ULTRA')
+        
+        attack_power = 0
+        is_difficult_action = False
+        
+        if is_legacy:
+            attack_power, is_difficult_action = self.calculate_tetrio_attack_power(
+                lines, t_spin_type, self.b2b_streak, self.ren_counter, is_pc
+            )
+        else:
+            attack_power, is_difficult_action = self.calculate_guideline_attack_power(
+                lines, t_spin_type, self.b2b_active, self.ren_counter, is_pc
+            )
+        if attack_power > 0:
+            self.add_notification(f"{attack_power}", GREEN)
         # [改修] Gauntletモードの処理を分離
         if self.game_mode == 'GAUNTLET':
-            # 1. 攻撃力を計算
-            attack_power = self.calculate_attack_power(lines, t_spin_type, self.b2b_active, self.ren_counter, is_pc)
-            if attack_power > 0:
-                self.add_notification(f"{attack_power}", GREEN)
             
             # 2. 相殺処理
             offset_amount = 0
             if attack_power > 0 and self.garbage_stock > 0:
                 offset_amount = min(attack_power, self.garbage_stock)
                 self.garbage_stock -= offset_amount
-                attack_power -= offset_amount
-                # print(f"Offset: Cleared {lines}, Stock {self.garbage_stock + offset_amount} -> Offset {offset_amount}, New Stock {self.garbage_stock}")
+                attack_power -= offset_amount # 相殺後の余剰攻撃力
 
             # 3. 進捗を加算 (計算した攻撃力で加算)
             self.progress_counter += attack_power
-            # print(f"Progress added: {attack_power}, Current Progress: {self.progress_counter}")
 
             # 4. お邪魔のせり上げ (相殺しきれなかった場合、またはライン消去なしの場合)
             garbage_to_add = 0
-            if attack_power == 0 and self.garbage_stock > 0: # ライン消去なし
+            if attack_power == 0 and self.garbage_stock > 0 and offset_amount == 0: # 攻撃なし＆ストックあり
                 garbage_to_add = self.garbage_stock
-            elif attack_power > 0 and offset_amount < attack_power and self.garbage_stock > 0: # 相殺しきれずストックが残った
-                # このケースではせり上げないのが一般的？ -> いや、相殺しきれなかったら即時せり上げのはず
-                pass # 通常、相殺優先なのでこの分岐はほぼ通らないはず
+            # (攻撃力 > 0 で相殺しきれなかった場合 (attack_power > 0)、その攻撃力は進捗に回る)
 
             if garbage_to_add > 0:
                 while garbage_to_add > 0:
@@ -596,7 +660,7 @@ class Game:
             self.update_gauntlet_level()
 
 
-        should_enter_roll_prep = self.add_score_and_update_level(lines, t_spin_type, is_pc)
+        should_enter_roll_prep = self.add_score_and_update_level(lines, t_spin_type, is_pc, attack_power, is_difficult_action)
 
         if should_enter_roll_prep:
             self.state = 'ROLL_PREP'; self.board.clear_all(); self.roll_prep_timer = 5000
@@ -652,7 +716,9 @@ class Game:
                 self.game_won = True; return
             self.set_gauntlet_attack_params()
 
-    def add_score_and_update_level(self, lines, t_spin_type, is_pc):
+    def add_score_and_update_level(self, lines, t_spin_type, is_pc, attack_power, is_difficult):
+        """ [改修] 攻撃力とB2B判定を引数で受け取る """
+        
         should_enter_roll_prep = False
         
         # [改修] モード別処理
@@ -665,37 +731,57 @@ class Game:
             if self.lines_cleared_total >= 40:
                 self.game_won = True
         
-        # [新規] ULTRA
+        # [新規] ULTRA (attack_powerはlock_downで計算済み)
         elif self.game_mode == 'ULTRA':
-            attack_power = self.calculate_attack_power(lines, t_spin_type, self.b2b_active, self.ren_counter, is_pc)
-            if attack_power > 0:
-                self.add_notification(f"{attack_power}", GREEN)
             self.total_attack += attack_power
             self.lines_cleared_total += lines
 
-        # (通知関連 - 変更なし)
+        # (通知関連)
         action_map = {
-            ("FULL", 1): (800, True, "T-Spin Single"), ("FULL", 2): (1200, True, "T-Spin Double"), ("FULL", 3): (1600, True, "T-Spin Triple"),
-            ("MINI", 1): (200, True, "T-Spin Mini"), ("MINI", 2): (400, True, "T-Spin Mini Double"),
-            ("NONE", 4): (800, True, "Tetris")
+            ("FULL", 1): "T-Spin Single", ("FULL", 2): "T-Spin Double", ("FULL", 3): "T-Spin Triple",
+            ("MINI", 1): "T-Spin Mini", ("MINI", 2): "T-Spin Mini Double",
+            ("NONE", 4): "Tetris"
         }
-        text_to_show = None; is_difficult = False
-        if (t_spin_type, lines) in action_map: _, is_difficult, text_to_show = action_map.get((t_spin_type, lines))
-        is_b2b = is_difficult and self.b2b_active
-        if is_b2b: self.add_notification("Back-to-Back", ORANGE)
+        text_to_show = action_map.get((t_spin_type, lines))
+        
+        is_legacy = (self.gauntlet_legacy_mode and self.game_mode == 'GAUNTLET') or \
+                    (self.ultra_legacy_mode and self.game_mode == 'ULTRA')
+        
+        is_b2b = False
+        if is_legacy:
+            is_b2b = is_difficult and self.b2b_streak > 0
+            if is_b2b: self.add_notification(f"B2B x{self.b2b_streak}", ORANGE)
+        else:
+            is_b2b = is_difficult and self.b2b_active
+            if is_b2b: self.add_notification("Back-to-Back", ORANGE)
+            
         if text_to_show: self.add_notification(text_to_show, YELLOW)
         if self.ren_counter >= 1: self.add_notification(f"{self.ren_counter} REN", CYAN)
-        if is_difficult: self.b2b_active = True
-        elif lines > 0: self.b2b_active = False
         if is_pc: self.add_notification("Perfect Clear", WHITE)
+        
+        # B2B / Streak 更新
+        if is_difficult:
+            self.b2b_active = True
+            self.b2b_streak += 1
+        elif lines > 0:
+            self.b2b_active = False
+            if is_legacy:
+                self.b2b_streak = 0 # Legacy (Tetr.io) モードではライン消去でB2Bが切れる
+        
         self.draw_notifications
 
         # [改修] MARATHON (ENDLESS含む) のみスコア計算
         if self.game_mode == 'MARATHON':
-            base_score = 0
-            if (t_spin_type, lines) in action_map: base_score, _, _ = action_map.get((t_spin_type, lines))
-            elif lines > 0: base_score = {1:100, 2:300, 3:500}.get(lines, 0)
-            b2b_bonus = 1.5 if is_b2b else 1.0
+            # MARATHONモードではスコア計算のためにガイドライン攻撃力を再計算 (B2Bボーナスはスコア用)
+            base_score_map = {
+                ("FULL", 1): 800, ("FULL", 2): 1200, ("FULL", 3): 1600,
+                ("MINI", 1): 200, ("MINI", 2): 400,
+                ("NONE", 4): 800,
+                ("NONE", 1): 100, ("NONE", 2): 300, ("NONE", 3): 500
+            }
+            base_score = base_score_map.get((t_spin_type, lines), 0)
+            
+            b2b_bonus = 1.5 if is_b2b else 1.0 # スコア計算時のB2Bボーナス
             ren_bonus = [0, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
             ren_score = ren_bonus[min(self.ren_counter, len(ren_bonus)-1)] * self.level if self.ren_counter > 0 else 0
             self.score += int(base_score * self.level * b2b_bonus) + ren_score
