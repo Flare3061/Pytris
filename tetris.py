@@ -935,7 +935,7 @@ class Game:
     def draw_game_over(self):
         s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA); s.fill((0, 0, 0, 180)); self.screen.blit(s, (0, 0))
         text = self.font_game_over.render('GAME OVER', True, RED); self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40)))
-        text_r = self.font_large.render('Press R to Restart', True, WHITE); self.screen.blit(text_r, text_r.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)))
+        text_r = self.font_large.render('Press R to return to the menu', True, WHITE); self.screen.blit(text_r, text_r.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)))
     def draw_game_won(self):
         s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA); s.fill((0, 0, 0, 180)); self.screen.blit(s, (0, 0))
         if self.game_mode == 'SPRINT':
@@ -943,7 +943,7 @@ class Game:
         else:
             text = self.font_game_over.render('YOU WIN!', True, YELLOW)
         self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40)))
-        text_r = self.font_large.render('Press R to Restart', True, WHITE); self.screen.blit(text_r, text_r.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)))
+        text_r = self.font_large.render('Press R to return to the menu', True, WHITE); self.screen.blit(text_r, text_r.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)))
 
 # --- メイン関数 ---
 def main():
