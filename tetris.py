@@ -176,11 +176,17 @@ class Game:
         self.state = 'MENU'
         # [改修] メニューオプションと状態
         self.game_mode = None
-        self.menu_options = ['MARATHON', 'SPRINT', 'APEX', 'GAUNTLET'] # [改修] ENDLESS削除、SPRINT追加、MASTER->APEX、順序変更
+        # [改修] SPRINTを削除し、SCORE ATTACKを追加
+        self.menu_options = ['MARATHON', 'SCORE ATTACK', 'APEX', 'GAUNTLET'] 
         self.selected_option = 0
+        
         self.marathon_type = None # [新規] '150 LINES' or 'ENDLESS'
         self.marathon_options = ['150 LINES', 'ENDLESS'] # [新規]
         self.selected_marathon_type = 0 # [新規]
+
+        # [新規] SCORE ATTACK サブメニュー
+        self.score_attack_options = ['SPRINT', 'ULTRA']
+        self.selected_score_attack_type = 0
 
         self.countdown_timer = 0; self.countdown_text = ""
         self.game_over = False; self.game_won = False
@@ -190,6 +196,11 @@ class Game:
         self.current_attack_interval = 0; self.current_attack_amount = 0
         self.progress_counter = 0; self.gauntlet_level = 1; self.gauntlet_max_level = 0
         self.gauntlet_legacy_mode = False # [新規] 裏モードフラグ
+
+        # [新規] ULTRAモード用
+        self.ultra_legacy_mode = False
+        self.total_attack = 0
+
         # [改修] 既存のテーブルを legacy (裏モード用) にリネーム
         # [改修] EASYのテーブルを調整
         self.gauntlet_attack_tables_legacy = {
@@ -243,6 +254,7 @@ class Game:
         self.initial_action = None; self.master_timer = 0; self.end_roll_timer = 65000; self.roll_prep_timer = 0
         self.garbage_stock = 0; self.attack_timer = 0; self.progress_counter = 0; self.gauntlet_level = 1
         self.gauntlet_alternate_mode = False # [新規] リスタート時にフラグをリセット
+        self.total_attack = 0 # [新規] ULTRAモード用にリセット
 
         self.bag = []
         first_mino = random.choice(['I', 'J', 'L', 'T']); self.bag.append(first_mino)
@@ -278,6 +290,28 @@ class Game:
             elif self.gauntlet_difficulty == 'HARD': self.gauntlet_max_level = 15
             elif self.gauntlet_difficulty == 'EXTREME' : self.gauntlet_max_level = 20
             else: self.gauntlet_max_level = 30
+        
+        # [新規] ULTRAモード初期化
+        elif self.game_mode == 'ULTRA':
+            if self.ultra_legacy_mode:
+                # Tetr.io準拠 (LEGACY) 設定
+                self.fall_speed = 1000
+                self.ARE_DELAY = self.ARE_DELAY_LEGACY
+                self.ARE_DELAY_LINE_CLEAR = self.ARE_DELAY_LINE_CLEAR_LEGACY
+                self.lock_delay_duration = self.LOCK_DELAY_DURATION_LEGACY
+                self.DAS_DELAY = self.DAS_DELAY_LEGACY
+                self.ARR_SPEED = self.ARR_SPEED_LEGACY
+            else:
+                 # 標準 (デフォルト) 設定
+                self.fall_speed = 1000
+                self.ARE_DELAY = 100
+                self.ARE_DELAY_LINE_CLEAR = 400
+                self.lock_delay_duration = 500
+                self.DAS_DELAY = 160
+                self.ARR_SPEED = 20
+            self.master_timer = 180000 # 3分 (ms)
+            self.level = 1 # UI表示用 (固定)
+
         elif self.game_mode == 'SPRINT': # [新規] SPRINT初期化
             self.fall_speed = 1000
             self.ARE_DELAY = 100; self.ARE_DELAY_LINE_CLEAR = 400
@@ -373,22 +407,36 @@ class Game:
         self.notifications = [n for n in self.notifications if n['timer'] > 0]
         for n in self.notifications: n['timer'] -= delta_time
         
-        # [改修] MARATHON_SELECT, DIFFICULTY_SELECT を追加
-        if self.state in ('MENU', 'MARATHON_SELECT', 'DIFFICULTY_SELECT'): return
+        # [改修] MARATHON_SELECT, DIFFICULTY_SELECT, SCORE_ATTACK_SELECT を追加
+        if self.state in ('MENU', 'MARATHON_SELECT', 'SCORE_ATTACK_SELECT', 'DIFFICULTY_SELECT'): return
 
-        # [改修] タイマーを動かすモードを追加 (SPRINT, APEX)
-        if self.game_mode in ['MARATHON', 'APEX', 'SPRINT'] and self.state not in ['MENU', 'COUNTDOWN']:
+        # [改修] タイマーを動かすモードを追加 (SPRINT, APEX, ULTRA)
+        if self.game_mode in ['MARATHON', 'APEX', 'SPRINT', 'ULTRA'] and self.state not in ['MENU', 'COUNTDOWN']:
             if self.game_mode == 'APEX' and self.state in ['END_ROLL', 'ARE_END_ROLL']: # [改修] APEXのみ
                 self.end_roll_timer -= delta_time
                 if self.end_roll_timer <= 0: self.game_won = True; return
             elif self.state not in ['MENU', 'COUNTDOWN', 'ROLL_PREP']: 
-                self.master_timer += delta_time # 共通タイマー
+                # [改修] ULTRAモードはタイマー減少
+                if self.game_mode == 'ULTRA':
+                    self.master_timer -= delta_time
+                    if self.master_timer <= 0:
+                        self.master_timer = 0
+                        self.game_won = True; return
+                else:
+                    self.master_timer += delta_time # 共通タイマー (MARATHON, APEX, SPRINT)
+        
         elif self.game_mode == 'GAUNTLET' and self.state not in ['MENU', 'COUNTDOWN']:
             # (GAUNTLETのタイマー処理 - 変更なし)
             self.attack_timer -= delta_time
             if self.attack_timer <= 0:
                 self.garbage_stock += self.current_attack_amount
-                table = self.gauntlet_attack_tables[self.gauntlet_difficulty]
+                
+                # [改修] LEGACYモード対応
+                active_table_set = self.gauntlet_attack_tables
+                if self.gauntlet_legacy_mode:
+                    active_table_set = self.gauntlet_attack_tables_legacy
+                
+                table = active_table_set[self.gauntlet_difficulty]
                 level_key = min(self.level, max(table.keys()))
                 self.current_attack_amount, self.current_attack_interval = table[level_key]
                 self.attack_timer += self.current_attack_interval
@@ -419,10 +467,11 @@ class Game:
         
         self.fall_time += delta_time
         
-        # [改修] LEGACYモードのソフトドロップ分岐
-        legacy_soft_drop = self.gauntlet_legacy_mode and is_soft_dropping_now and self.game_mode == 'GAUNTLET'
-
-        if legacy_soft_drop:
+        # [改修] LEGACYモードのソフトドロップ分岐 (GAUNTLET または ULTRA)
+        legacy_soft_drop = (self.gauntlet_legacy_mode and self.game_mode == 'GAUNTLET') or \
+                           (self.ultra_legacy_mode and self.game_mode == 'ULTRA')
+        
+        if legacy_soft_drop and is_soft_dropping_now:
             # [新規] LEGACYモードのソフトドロップ (即接地)
             ghost_y = self.board.get_ghost_y(self.current_tetromino)
             if self.current_tetromino.y < ghost_y:
@@ -448,7 +497,8 @@ class Game:
                 for _ in range(drop_count):
                     if not self.board.is_valid_position(self.current_tetromino, offset_y=1): break
                     self.current_tetromino.move(0, 1, self.board)
-                    if is_soft_dropping_now and self.game_mode in ['GAUNTLET', 'SPRINT']: pass 
+                    # [改修] ULTRAモードでもSDスコアは加算しない
+                    if is_soft_dropping_now and self.game_mode in ['GAUNTLET', 'SPRINT', 'ULTRA']: pass 
                     elif is_soft_dropping_now and self.game_mode != 'APEX': self.score += 1
                 if self.board.is_valid_position(self.current_tetromino, offset_y=1): 
                     self.is_grounded = False
@@ -615,6 +665,14 @@ class Game:
             if self.lines_cleared_total >= 40:
                 self.game_won = True
         
+        # [新規] ULTRA
+        elif self.game_mode == 'ULTRA':
+            attack_power = self.calculate_attack_power(lines, t_spin_type, self.b2b_active, self.ren_counter, is_pc)
+            if attack_power > 0:
+                self.add_notification(f"{attack_power}", GREEN)
+            self.total_attack += attack_power
+            self.lines_cleared_total += lines
+
         # (通知関連 - 変更なし)
         action_map = {
             ("FULL", 1): (800, True, "T-Spin Single"), ("FULL", 2): (1200, True, "T-Spin Double"), ("FULL", 3): (1600, True, "T-Spin Triple"),
@@ -668,10 +726,14 @@ class Game:
                         self.state = 'DIFFICULTY_SELECT'
                     elif self.game_mode == 'MARATHON':
                         self.state = 'MARATHON_SELECT' # [新規]
-                    else: # SPRINT or APEX
+                    # [新規] SCORE ATTACK サブメニューへ
+                    elif self.game_mode == 'SCORE ATTACK':
+                        self.state = 'SCORE_ATTACK_SELECT'
+                    else: # APEX
                         self.reset_game_variables()
                         self.state = 'COUNTDOWN'
                         self.countdown_timer = 2000
+            
             elif self.state == 'MARATHON_SELECT': # [新規] MARATHONサブメニュー
                  if event.key == pygame.K_UP: 
                      self.selected_marathon_type = (self.selected_marathon_type - 1) % len(self.marathon_options)
@@ -684,6 +746,32 @@ class Game:
                      self.countdown_timer = 2000
                  elif event.key == pygame.K_ESCAPE: 
                      self.state = 'MENU'
+
+            # [新規] SCORE ATTACK サブメニュー
+            elif self.state == 'SCORE_ATTACK_SELECT':
+                 if event.key == pygame.K_UP: 
+                     self.selected_score_attack_type = (self.selected_score_attack_type - 1) % len(self.score_attack_options)
+                 elif event.key == pygame.K_DOWN: 
+                     self.selected_score_attack_type = (self.selected_score_attack_type + 1) % len(self.score_attack_options)
+                 elif event.key == pygame.K_RETURN:
+                     # 選択されたモード (SPRINT or ULTRA) を game_mode に設定
+                     self.game_mode = self.score_attack_options[self.selected_score_attack_type]
+                     
+                     # [新規] 裏モード判定 (ULTRAのみ)
+                     mods = pygame.key.get_mods()
+                     is_alternate = (mods & pygame.KMOD_SHIFT) or (mods & pygame.KMOD_CTRL)
+                     
+                     if self.game_mode == 'ULTRA':
+                         self.ultra_legacy_mode = is_alternate
+                     else:
+                         self.ultra_legacy_mode = False # SPRINTでは未使用
+
+                     self.reset_game_variables()
+                     self.state = 'COUNTDOWN'
+                     self.countdown_timer = 2000
+                 elif event.key == pygame.K_ESCAPE: 
+                     self.state = 'MENU'
+
             elif self.state == 'DIFFICULTY_SELECT':
                  if event.key == pygame.K_UP: self.selected_difficulty = (self.selected_difficulty - 1) % len(self.difficulty_options)
                  elif event.key == pygame.K_DOWN: self.selected_difficulty = (self.selected_difficulty + 1) % len(self.difficulty_options)
@@ -725,8 +813,10 @@ class Game:
     def hard_drop(self):
         if not self.current_tetromino: return
         drop_dist = self.board.get_ghost_y(self.current_tetromino) - self.current_tetromino.y
-        if self.game_mode != 'APEX' and self.game_mode != 'GAUNTLET': self.score += drop_dist * 2
-        self.current_tetromino.y += drop_dist; self.last_move_was_rotate = False; self.lock_down()
+        # [改修] ULTRAモードでもHDスコアは加算しない
+        if self.game_mode != 'APEX' and self.game_mode != 'GAUNTLET' and self.game_mode != 'ULTRA': 
+            self.score += drop_dist * 2
+        self.current_tetromino.y += drop_dist; self.lock_down()
     def hold(self):
         if not self.can_hold: return
         self.can_hold = False
@@ -744,6 +834,8 @@ class Game:
         # [改修] 描画ステート追加
         if self.state == 'MENU': self.draw_menu()
         elif self.state == 'MARATHON_SELECT': self.draw_marathon_menu() # [新規]
+        # [新規] SCORE ATTACK サブメニュー描画
+        elif self.state == 'SCORE_ATTACK_SELECT': self.draw_score_attack_menu()
         elif self.state == 'DIFFICULTY_SELECT': self.draw_difficulty_menu()
         else:
             is_board_visible = self.state not in ['END_ROLL', 'ARE_END_ROLL']
@@ -785,6 +877,9 @@ class Game:
             self.draw_gauntlet_ui(ui_left_x, ui_right_x)
         elif self.game_mode == 'SPRINT': # [新規]
             self.draw_sprint_ui(ui_left_x, ui_right_x)
+        # [新規] ULTRA
+        elif self.game_mode == 'ULTRA':
+            self.draw_ultra_ui(ui_left_x, ui_right_x)
         elif self.game_mode == 'MARATHON': # [改修]
             self.draw_standard_ui(ui_left_x, ui_right_x)
     
@@ -847,6 +942,36 @@ class Game:
         lines_progress = self.font.render(f"{self.lines_cleared_total} / 40", True, WHITE)
         self.screen.blit(lines_progress, (ui_left_x, stats_y_base + 40))
     
+    def draw_ultra_ui(self, ui_left_x, ui_right_x):
+        """ [新規] ULTRAモードのUIを描画 """
+        stats_y_base = FIELD_OFFSET_Y + 70 + 5 * 80 + 20
+
+        # TIME (右側)
+        seconds = max(0, self.master_timer / 1000)
+        minutes = int(seconds // 60)
+        seconds %= 60
+        timer_text = f"{minutes:02}:{seconds:05.2f}"
+        # ラスト10秒でタイマーを赤くする
+        timer_color = RED if self.master_timer < 10000 else WHITE
+        
+        time_label = self.font_large.render('TIME', True, WHITE)
+        self.screen.blit(time_label, (ui_right_x, stats_y_base))
+        time_val = self.font_large.render(timer_text, True, timer_color)
+        self.screen.blit(time_val, (ui_right_x, stats_y_base + 40))
+
+        # LINES (左側)
+        lines_text = self.font_large.render(f"LINES", True, WHITE)
+        self.screen.blit(lines_text, (ui_left_x, stats_y_base))
+        lines_val = self.font.render(f"{self.lines_cleared_total}", True, WHITE)
+        self.screen.blit(lines_val, (ui_left_x, stats_y_base + 40))
+
+        # ATTACK (左側、LINESの下)
+        attack_text = self.font_large.render(f"ATTACK", True, WHITE)
+        self.screen.blit(attack_text, (ui_left_x, stats_y_base + 80))
+        attack_val = self.font.render(f"{self.total_attack}", True, WHITE)
+        self.screen.blit(attack_val, (ui_left_x, stats_y_base + 120))
+
+
     def draw_gauntlet_gauge(self, gauge_x, gauge_y):
         """ [新規] Gauntletのお邪魔ゲージとタイマーを描画 """
         gauge_width = 20
@@ -917,6 +1042,17 @@ class Game:
         info = self.font.render("UP/DOWN to select, ENTER to start, ESC to back", True, WHITE)
         self.screen.blit(info, info.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 300)))
     
+    def draw_score_attack_menu(self):
+        """ [新規] SCORE ATTACKタイプ選択画面 """
+        title = self.font_menu.render("Score Attack", True, WHITE)
+        self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 150)))
+        for i, option in enumerate(self.score_attack_options):
+            color = YELLOW if i == self.selected_score_attack_type else WHITE
+            text = self.font_large.render(option, True, color)
+            self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50 + i * 60)))
+        info = self.font.render("UP/DOWN to select, ENTER to start, ESC to back", True, WHITE)
+        self.screen.blit(info, info.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 300)))
+
     def draw_difficulty_menu(self):
         title = self.font_menu.render("Select Difficulty", True, WHITE)
         self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 150)))
@@ -938,8 +1074,11 @@ class Game:
         text_r = self.font.render('Press R to return to the menu', True, WHITE); self.screen.blit(text_r, text_r.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)))
     def draw_game_won(self):
         s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA); s.fill((0, 0, 0, 180)); self.screen.blit(s, (0, 0))
+        # [改修] SPRINTとULTRAの勝利メッセージを変更
         if self.game_mode == 'SPRINT':
             text = self.font_game_over.render('FINISH!', True, CYAN)
+        elif self.game_mode == 'ULTRA':
+            text = self.font_game_over.render('TIME UP!', True, CYAN)
         else:
             text = self.font_game_over.render('YOU WIN!', True, YELLOW)
         self.screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40)))
